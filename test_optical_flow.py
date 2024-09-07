@@ -172,13 +172,13 @@ if __name__ == '__main__':
         
         out_img = cv2.vconcat([err_histograms, warping_errors, flows])
         
-        saving_path = os.path.join("OF_Analysis", str(curr_flow_timestamp) + ".png")
-        cv2.imwrite(saving_path, out_img)
+        # saving_path = os.path.join("OF_Analysis", str(curr_flow_timestamp) + ".png")
+        # cv2.imwrite(saving_path, out_img)
 
         # cv2.imshow("depth_map_vis", depth_map_vis)
         # cv2.imshow("original_image", curr_img)
-        # cv2.imshow("out_img", out_img)
+        cv2.imshow("estimated_flow_bgr", estimated_flow_bgr)
 
-        # key =cv2.waitKey()
-        # if key == ord("q"):
-        #     break
+        key =cv2.waitKey()
+        if key == ord("q"):
+            break

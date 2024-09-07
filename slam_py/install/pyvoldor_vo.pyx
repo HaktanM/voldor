@@ -12,14 +12,14 @@ cdef extern from "../../voldor/py_export.h":
         const float fx, const float fy, const float cx, const float cy, const float basefocal,
         const int N, const int N_dp, const int w, const int h,
         const char* config,
-        int& n_registered, float* poses, float* poses_covar, float* depth, float* depth_conf)
+        int& n_registered, float* innovation, float* poses, float* poses_covar, float* depth, float* depth_conf)
 
 def voldor(
     np.ndarray[float, ndim=4] flows not None,
     np.ndarray[float, ndim=2] kinematic_state,
     float fx, float fy, float cx, float cy, 
     float basefocal = 0,
-    np.ndarray[float, ndim=2] img_frame = None,
+    np.ndarray[float, ndim=3] img_frame = None,
     np.ndarray[float, ndim=2] disparity = None,
     np.ndarray[float, ndim=2] disparity_pconf = None,
     np.ndarray[float, ndim=3] depth_priors = None,
@@ -50,6 +50,8 @@ def voldor(
     if depth_prior_pconfs is not None:
         depth_prior_pconfs = np.ascontiguousarray(depth_prior_pconfs)
     
+    cdef np.ndarray[float, ndim=1, mode='c'] innovation = \
+        np.ascontiguousarray(np.zeros((5), dtype=np.float32))
     cdef np.ndarray[float, ndim=2, mode='c'] poses = \
         np.ascontiguousarray(np.zeros((N, 6), dtype=np.float32))
     cdef np.ndarray[float, ndim=3, mode='c'] poses_covar = \
@@ -61,7 +63,7 @@ def voldor(
 
     cdef int n_registered = 0
     py_voldor_wrapper(
-                &flows[0,0,0,0], &img_frame[0,0], &kinematic_state[0,0],
+                &flows[0,0,0,0], &img_frame[0,0,0], &kinematic_state[0,0],
                 &disparity[0,0] if disparity is not None else NULL,
                 &disparity_pconf[0,0] if disparity_pconf is not None else NULL,
                 &depth_priors[0,0,0] if depth_priors is not None else NULL,
@@ -71,12 +73,14 @@ def voldor(
                 N, N_dp, w, h,
                 config.encode(),
                 n_registered,
+                &innovation[0],
                 &poses[0,0],
                 &poses_covar[0,0,0],
                 &depth[0,0],
                 &depth_conf[0,0])
 
     return {'n_registered': n_registered,
+            'innovation': innovation,
             'poses': poses[:n_registered],
             'poses_covar': poses_covar[:n_registered],
             'depth': depth,

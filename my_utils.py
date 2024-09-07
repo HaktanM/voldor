@@ -61,6 +61,12 @@ class _CameraModel:
         R_g_bk = R_bk_g.transpose()
         v_bk_g = v_bk_g.reshape(3,1)
         
+        # print(R_bk_g)
+        # print(v_bk_g)
+        # print(Delta_R)
+        # print(Delta_t)
+
+        
         # Compute the incremental pose for body frame using IMU measurements
         # Orientation
         R_bn_bc = Delta_R
@@ -84,20 +90,35 @@ class _CameraModel:
         # Compute omega
         w = self.K @ R_cc_cn @ self.bearings
         
+        # print(self.K @ R_cc_cn)
+        # print(self.bearings[:,100:105])
+        # print(w[:,100:105])
+        
         
         # Compute b,    --->   b term is the same for all pixels
         b = self.K @ t_cc_cn
+        print(w[:,13300:13300+5])
+        print(b.reshape(3,1))
+
         b = np.tile(b, (1, w.shape[1]))
+        
+            
+        
         
         # Get the depth map
         depth_reshaped = depth_map.reshape(1,self.h*self.w) 
+        print(depth_reshaped[:,13300:13300+5])
+
         depth_reshaped = np.tile(depth_reshaped, (3, 1))
         
         # Elementary-wise multiplication
         w_depth = w * depth_reshaped
         
+        
+
         # Compute the propagated pixels
         propagated_pixels = w_depth + b
+        print(propagated_pixels[:,13300:13300+5])
         propagated_pixels = propagated_pixels / propagated_pixels[2,:]
         
         # Compute the optical flow
@@ -107,12 +128,20 @@ class _CameraModel:
         estimated_optical_flow_x = estimated_optical_flow[0,:]
         estimated_optical_flow_y = estimated_optical_flow[1,:]
         
+        print(self.pixels[:,13300:13300+5])
+        print(propagated_pixels[:,13300:13300+5])
+        print(estimated_optical_flow[:,13300:13300+5])
+        
         estimated_optical_flow_x = estimated_optical_flow_x.reshape(self.h, self.w) 
         estimated_optical_flow_y = estimated_optical_flow_y.reshape(self.h, self.w)
+        
+        
         
         estimated_flow = np.zeros((self.h, self.w, 2))
         estimated_flow[:,:,0] = estimated_optical_flow_x
         estimated_flow[:,:,1] = estimated_optical_flow_y
+        
+        
         return estimated_flow
         
         

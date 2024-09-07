@@ -50,9 +50,9 @@ if __name__ == '__main__':
     
     num_of_flows = slam.data.FlowList.itemCount()
 
-    start_idx = 50
+    start_idx = 150
     # flow_idx = start_idx
-    for flow_idx in range(50, num_of_flows-slam.voldor_winsize-1):
+    for flow_idx in range(start_idx, num_of_flows-slam.voldor_winsize-1):
         
         # Load the flows
         flows = []
@@ -116,22 +116,29 @@ if __name__ == '__main__':
         Delta_R_b_g = Delta_R_b_g.astype(np.float32).reshape(3,3)
         Delta_t_b_g = Delta_t_b_g.reshape(3,1).astype(np.float32).reshape(3,1)
         
-        kinematic_state = np.concatenate((R_b0_g, v_gb_g, T_c_b_, Delta_R_b_g, Delta_t_b_g), axis=1)
-        kinematic_state = kinematic_state.transpose()
-    
+        
+        R_g_b = R_b0_g.transpose()
+        v_gb_b = R_g_b @ v_gb_g.reshape(3,1)
+        kinematic_state = np.concatenate((R_g_b, v_gb_b, T_c_b_, Delta_R_b_g, Delta_t_b_g), axis=1)
+        kinematic_state = kinematic_state.transpose()  
 
         # Get the depth map and original image to feed into voldor in order to debug
         curr_timestamp = slam.data.FlowList.getItemID(flow_idx)
+        next_timestamp = slam.data.FlowList.getItemID(flow_idx+1)
         path_to_depth_map = slam.data.DepthList.getItemPathFromTimeStamp(curr_timestamp)
         depth_map = my_utils.read_pfm(path_to_depth_map)
         
         
-        path_to_image = slam.data.ImageList.getItemPathFromTimeStamp(curr_timestamp)
-        gray_img_frame = cv2.imread(path_to_image, cv2.IMREAD_GRAYSCALE).astype(np.float32)
+        path_to_curr_image = slam.data.ImageList.getItemPathFromTimeStamp(curr_timestamp)
+        curr_gray_img_frame = cv2.imread(path_to_curr_image, cv2.IMREAD_GRAYSCALE).astype(np.float32)
 
+        path_to_next_image = slam.data.ImageList.getItemPathFromTimeStamp(next_timestamp)
+        next_gray_img_frame = cv2.imread(path_to_next_image, cv2.IMREAD_GRAYSCALE).astype(np.float32)
+
+        img_arr = [curr_gray_img_frame, next_gray_img_frame]
         py_voldor_kwargs = {
             'flows': np.stack(flows, axis=0),
-            'img_frame': gray_img_frame,
+            'img_frame': np.stack(img_arr, axis=0),
             'kinematic_state': kinematic_state,
             'fx':slam.cam_model.fx, 'fy':slam.cam_model.fy, 'cx':slam.cam_model.cx, 'cy':slam.cam_model.cy, 'basefocal':1.0,
             'disparity' : None,
@@ -144,7 +151,8 @@ if __name__ == '__main__':
         vo_ret = slam.cython_process_pool.apply(py_voldor_funmap)
         
         estimated_depth_map = vo_ret['depth']
-        
+        innovation_term = vo_ret['innovation']
+        print(innovation_term)
         # cv2.imshow("gray_img_frame",gray_img_frame.astype(np.uint8))
         # cv2.waitKey()
         

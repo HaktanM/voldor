@@ -134,7 +134,6 @@ void VOLDOR::init(vector<Mat> _flows,
 }
 
 int VOLDOR::solve() {
-	// cout << "Only the depth is estimated within VOLDOR Framework." << endl;
 	if (n_depth_priors == 0)
 		bootstrap();
 	while (iters_remain > 0 && n_flows > 0) {

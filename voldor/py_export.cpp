@@ -1,6 +1,6 @@
 #include "py_export.h"
 #include "voldor.h"
-#include "kinematic_state_optimizer.hpp"
+#include "optimizer.hpp"
 #include <iterator>
 
 int py_voldor_wrapper(
@@ -14,7 +14,7 @@ int py_voldor_wrapper(
 	const int N, const int N_dp, const int w, const int h,
 	const char* config_pt,
 	// outputs
-	int& n_registered, float* poses_pt, float* poses_covar_pt, float* depth_pt, float* depth_conf_pt) {
+	int& n_registered, float* innovation_pt, float* poses_pt, float* poses_covar_pt, float* depth_pt, float* depth_conf_pt) {
 
 	Config cfg;
 	std::istringstream iss(config_pt);
@@ -52,29 +52,33 @@ int py_voldor_wrapper(
 			depth_priors_pconfs.push_back(Mat(Size(w, h), CV_32F, (void*)(depth_prior_pconfs_pt + i * w*h)));
 	}
 
-
+	// Get the Estimated Depth Map
 	VOLDOR voldor(cfg);
 	voldor.init(flows, disparity, disparity_pconf, depth_priors, depth_prior_poses, depth_priors_pconfs);
 	voldor.solve();
 
-	// Parameters to optimize
-	double velocity_innovation[3] = {0.0, 0.0, 0.0};
-	KINEMATIC_STATE kinematic_state_optimizer(flows_pt, depth_pt, kinematic_state_pt, velocity_innovation, w, h);
-
-	kinematic_state_optimizer.visualize(img_frame_pt);
-	// kinematic_state_optimizer.optimize(flows_pt, depth_pt, kinematic_state_pt, velocity_innovation, w, h);
+	
 
 	n_registered = voldor.n_flows;
 
-	for (int i = 0; i < voldor.n_flows; i++) {
-		if (poses_pt)
-			memcpy(poses_pt + i * 6, voldor.cams[i].pose6().val, 6 * sizeof(float));
-		if (poses_covar_pt)
-			memcpy(poses_covar_pt + i * 6 * 6, voldor.cams[i].pose_covar.data, 6 * 6 * sizeof(float));
-	}
-
-	if (depth_pt)
+	if (depth_pt){
 		memcpy(depth_pt, voldor.depth.data, w*h * sizeof(float));
+
+		// Get the Innovation for Kinematic State
+		float state_innovation_pt[5] = {0.0, 0.0, 0.0, 0.0, 0.0};
+		SOLVER::Manager kinematic_state_optimizer(flows_pt, depth_pt, kinematic_state_pt, w, h);	
+		kinematic_state_optimizer.computeInnovation(state_innovation_pt);
+		// kinematic_state_optimizer.visualize(img_frame_pt);
+
+		std::cout << "Innovations : ";
+		for (int i = 0; i < 5; ++i) {
+			std::cout << state_innovation_pt[i] << ", ";
+		}
+		std::cout << std::endl;
+
+		if(innovation_pt)
+			memcpy(innovation_pt, state_innovation_pt, 5 * sizeof(float));
+	};
 
 	if (depth_conf_pt) {
 		Mat depth_conf = Mat::zeros(Size(w, h), CV_32F);
